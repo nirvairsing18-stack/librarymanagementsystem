@@ -1,0 +1,11 @@
+# Compiled programs
+library
+library.exe
+a.out
+*.o
+*.obj
+
+# IDE/editor files
+.vscode/
+.idea/
+.DS_Store
