@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Library Management System</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    background: #f3f5fa;
+    color: #202b40;
+}
+
+header {
+    background: #172b4d;
+    color: white;
+    padding: 25px 7%;
+}
+
+header h1 {
+    font-size: 27px;
+}
+
+header p {
+    margin-top: 8px;
+    color: #cbd5e1;
+}
+
+.container {
+    max-width: 1100px;
+    margin: 35px auto;
+    padding: 0 20px;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 18px;
+    margin-bottom: 25px;
+}
+
+.stat, .panel {
+    background: white;
+    padding: 23px;
+    border-radius: 12px;
+    box-shadow: 0 3px 15px #0000000b;
+}
+
+.stat h2 {
+    font-size: 30px;
+    color: #315baf;
+    margin-top: 12px;
+}
+
+.panel {
+    margin-bottom: 22px;
+}
+
+.panel h2 {
+    margin-bottom: 18px;
+    font-size: 20px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #d5dbea;
+    border-radius: 7px;
+    outline: none;
+}
+
+input:focus {
+    border-color: #315baf;
+}
+
+button {
+    padding: 11px 17px;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    background: #315baf;
+    color: white;
+    font-weight: bold;
+}
+
+button:hover {
+    opacity: 0.85;
+}
+
+.search {
+    margin-bottom: 15px;
+    max-width: 350px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px;
+}
+
+th, td {
+    padding: 14px;
+    text-align: left;
+    border-bottom: 1px solid #edf0f5;
+}
+
+th {
+    background: #f6f8fc;
+}
+
+.available {
+    color: #16834b;
+    font-weight: bold;
+}
+
+.issued {
+    color: #d17a17;
+    font-weight: bold;
+}
+
+.actions {
+    display: flex;
+    gap: 7px;
+}
+
+.return {
+    background: #16834b;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+footer {
+    text-align: center;
+    padding: 25px;
+    color: #778196;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>📚 Library Management System</h1>
+    <p>C++ Object-Oriented Programming Mini Project</p>
+</header>
+
+<div class="container">
+
+    <div class="stats">
+        <div class="stat">
+            Total Books
+            <h2 id="totalBooks">0</h2>
+        </div>
+
+        <div class="stat">
+            Available Books
+            <h2 id="availableBooks">0</h2>
+        </div>
+
+        <div class="stat">
+            Issued Books
+            <h2 id="issuedBooks">0</h2>
+        </div>
+    </div>
+
+    <section class="panel">
+        <h2>Add New Book</h2>
+
+        <form id="bookForm">
+            <div class="form-grid">
+                <input id="bookId" placeholder="Book ID" required>
+                <input id="bookTitle" placeholder="Book Title" required>
+                <input id="bookAuthor" placeholder="Author Name" required>
+                <button type="submit">Add Book</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel">
+        <h2>Book Inventory</h2>
+
+        <input class="search" id="search"
+            placeholder="Search by ID, title or author...">
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Book ID</th>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody id="bookList">
+                    <tr>
+                        <td colspan="5">Loading books...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+
+<footer>
+    Library Management System | C++ OOP Mini Project
+</footer>
+
+<script>
+const API = "/api/books";
+let books = [];
+
+async function loadBooks() {
+    try {
+        const response = await fetch(API);
+        if (!response.ok) throw new Error("Could not load books");
+
+        books = await response.json();
+        renderBooks();
+    } catch (error) {
+        document.getElementById("bookList").innerHTML =
+            `<tr><td colspan="5">
+            Backend not connected yet. Please try again after deployment.
+            </td></tr>`;
+    }
+}
+
+function renderBooks() {
+    const search = document.getElementById("search")
+        .value.toLowerCase();
+
+    const filtered = books.filter(book =>
+        String(book.id).toLowerCase().includes(search) ||
+        book.title.toLowerCase().includes(search) ||
+        book.author.toLowerCase().includes(search)
+    );
+
+    document.getElementById("totalBooks").textContent = books.length;
+
+    document.getElementById("availableBooks").textContent =
+        books.filter(book => !book.issued).length;
+
+    document.getElementById("issuedBooks").textContent =
+        books.filter(book => book.issued).length;
+
+    const list = document.getElementById("bookList");
+
+    if (filtered.length === 0) {
+        list.innerHTML =
+            '<tr><td colspan="5">No books found.</td></tr>';
+        return;
+    }
+
+    list.innerHTML = filtered.map(book => `
+        <tr>
+            <td>${escapeHTML(book.id)}</td>
+            <td>${escapeHTML(book.title)}</td>
+            <td>${escapeHTML(book.author)}</td>
+            <td class="${book.issued ? 'issued' : 'available'}">
+                ${book.issued ? 'Issued' : 'Available'}
+            </td>
+            <td>
+                <div class="actions">
+                    <button class="${book.issued ? 'return' : ''}"
+                        onclick="changeStatus('${encodeURIComponent(book.id)}',
+                        ${!book.issued})">
+                        ${book.issued ? 'Return' : 'Issue'}
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join("");
+}
+
+function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[char]);
+}
+
+document.getElementById("bookForm")
+.addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const book = {
+        id: document.getElementById("bookId").value.trim(),
+        title: document.getElementById("bookTitle").value.trim(),
+        author: document.getElementById("bookAuthor").value.trim()
+    };
+
+    try {
+        const response = await fetch(API, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(book)
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message);
+
+        event.target.reset();
+        await loadBooks();
+        alert("Book added successfully!");
+    } catch (error) {
+        alert(error.message || "Could not add book.");
+    }
+});
+
+async function changeStatus(id, issue) {
+    try {
+        const response = await fetch(
+            `${API}/${id}/${issue ? 'issue' : 'return'}`,
+            {method: "POST"}
+        );
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message);
+
+        await loadBooks();
+    } catch (error) {
+        alert(error.message || "Operation failed.");
+    }
+}
+
+document.getElementById("search")
+.addEventListener("input", renderBooks);
+
+loadBooks();
+</script>
+
+</body>
+</html>
