@@ -5,6 +5,8 @@
 #include <iostream>
 #include <string>
 #include <stdexcept>
+#include <fstream>
+#include <iterator>
 
 using namespace std;
 
@@ -39,7 +41,9 @@ public:
     crow::json::wvalue getBooks() {
         crow::json::wvalue::list result;
 
-        const char* sql = "SELECT id, title, author, issued FROM books ORDER BY id;";
+        const char* sql =
+            "SELECT id, title, author, issued FROM books ORDER BY id;";
+
         sqlite3_stmt* statement = nullptr;
 
         if (sqlite3_prepare_v2(database, sql, -1, &statement, nullptr) != SQLITE_OK)
@@ -79,7 +83,6 @@ public:
         return success;
     }
 
-    // Returns true if the book status was changed.
     bool changeStatus(int id, bool issue) {
         const char* sql = issue
             ? "UPDATE books SET issued = 1 WHERE id = ? AND issued = 0;"
@@ -113,22 +116,6 @@ public:
         sqlite3_finalize(statement);
         return found;
     }
-
-    bool isIssued(int id) {
-        sqlite3_stmt* statement = nullptr;
-
-        if (sqlite3_prepare_v2(database,
-            "SELECT issued FROM books WHERE id = ?;", -1,
-            &statement, nullptr) != SQLITE_OK)
-            return false;
-
-        sqlite3_bind_int(statement, 1, id);
-        bool issued = sqlite3_step(statement) == SQLITE_ROW &&
-                      sqlite3_column_int(statement, 0) != 0;
-
-        sqlite3_finalize(statement);
-        return issued;
-    }
 };
 
 Library library;
@@ -136,11 +123,12 @@ Library library;
 crow::response errorResponse(int status, const string& message) {
     crow::json::wvalue result;
     result["message"] = message;
-    return crow::response(status, result);
+    return crow::response(status, result.dump());
 }
 
 int main() {
     const char* databasePath = getenv("DATABASE_PATH");
+
     if (databasePath == nullptr)
         databasePath = "library.db";
 
@@ -156,6 +144,26 @@ int main() {
     }
 
     crow::SimpleApp app;
+
+    // Display the website homepage.
+    CROW_ROUTE(app, "/")
+    ([]() {
+        ifstream file("index.html");
+
+        if (!file.is_open()) {
+            return crow::response(500, "Could not load index.html");
+        }
+
+        string html(
+            (istreambuf_iterator<char>(file)),
+            istreambuf_iterator<char>()
+        );
+
+        crow::response response(html);
+        response.set_header("Content-Type", "text/html; charset=utf-8");
+
+        return response;
+    });
 
     // Get all books.
     CROW_ROUTE(app, "/api/books")
@@ -178,7 +186,13 @@ int main() {
             return errorResponse(400, "Please provide ID, title and author.");
 
         try {
-            int id = stoi(body["id"].s());
+            int id;
+
+            if (body["id"].t() == crow::json::type::Number)
+                id = static_cast<int>(body["id"].i());
+            else
+                id = stoi(body["id"].s());
+
             string title = body["title"].s();
             string author = body["author"].s();
 
@@ -190,6 +204,7 @@ int main() {
 
             crow::json::wvalue result;
             result["message"] = "Book added successfully!";
+
             return crow::response(201, result.dump());
         } catch (...) {
             return errorResponse(400, "Invalid book information.");
@@ -223,6 +238,7 @@ int main() {
     });
 
     int port = 8080;
+
     if (const char* portValue = getenv("PORT")) {
         try {
             port = stoi(portValue);
